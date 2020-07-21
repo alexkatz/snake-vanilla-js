@@ -2,6 +2,8 @@
 
 const FRAME_MS = 80;
 
+const INITIAL_SNAKE_LENGTH = 2;
+
 const SIZE = {
   PIXEL: 30,
   BOARD: 30,
@@ -168,8 +170,8 @@ const getNextHeadCoords = ({ i, j } = getRandomCoords(10), direction) => {
   }
 };
 
-const getNextTailCoords = ({ snakeLength, tailCoords, headCoords }, nextHeadCoords, nextSnakeLength) => {
-  if (tailCoords === undefined) {
+const getNextTailCoords = ({ snakeLength, tailCoordsList, headCoords }, nextHeadCoords, nextSnakeLength) => {
+  if (tailCoordsList === undefined) {
     // create initial tail based on snake length, always to the left since initial direction is right. minus 1 because the head is part of the length.
     return [...Array(snakeLength - 1).keys()].map((i) => ({
       i: nextHeadCoords.i - (i + 1),
@@ -180,25 +182,26 @@ const getNextTailCoords = ({ snakeLength, tailCoords, headCoords }, nextHeadCoor
   // we collected a candy! yum. snake must grow. we'll store the old end of the tail before the new tail is generated
   let newTailCoords;
   if (nextSnakeLength > snakeLength) {
-    newTailCoords = tailCoords[tailCoords.length - 1];
+    newTailCoords = tailCoordsList[tailCoordsList.length - 1];
   }
 
   // 0th index assumes old head, 1st index assumes 0th, 2nd index assumes 1st, etc.
-  const nextTailCoords = tailCoords.map((_, index) => {
+  const nextTailCoordsList = tailCoordsList.map((_, index) => {
     if (index === 0) return headCoords;
-    return tailCoords[index - 1];
+    return tailCoordsList[index - 1];
   });
 
   // if the tail should grow, we'll take the old end of the tail onto the end of the new tail, so it grows!
   if (newTailCoords) {
-    nextTailCoords.push(newTailCoords);
+    nextTailCoordsList.push(newTailCoords);
   }
 
-  return nextTailCoords;
+  return nextTailCoordsList;
 };
 
-const getNextGameOver = (headCoords) => {
+const getNextGameOver = (headCoords, tailCoordsList) => {
   if (!isWithinBounds(headCoords, SIZE.BOARD)) return true;
+  if (tailCoordsList.some((t) => coordsAreEqual(headCoords, t))) return true;
   return false;
 };
 
@@ -217,10 +220,10 @@ const getNextGameState = (gameState) => {
   if (!gameState)
     return {
       headCoords: undefined,
-      tailCoords: undefined,
+      tailCoordsList: undefined,
       candyCoords: getRandomCoords(),
       snakeDirection: DIRECTION.RIGHT,
-      snakeLength: 2,
+      snakeLength: INITIAL_SNAKE_LENGTH,
       gameOver: false,
     };
 
@@ -228,12 +231,12 @@ const getNextGameState = (gameState) => {
   const nextHeadCoords = getNextHeadCoords(gameState.headCoords, nextSnakeDirection);
   const nextCandyCoords = getNextCandyCoords(nextHeadCoords, gameState.candyCoords);
   const nextSnakeLength = getNextSnakeLength(nextHeadCoords, gameState.candyCoords, gameState.snakeLength);
-  const nextTailCoords = getNextTailCoords(gameState, nextHeadCoords, nextSnakeLength);
-  const nextGameOver = getNextGameOver(nextHeadCoords);
+  const nextTailCoordsList = getNextTailCoords(gameState, nextHeadCoords, nextSnakeLength);
+  const nextGameOver = getNextGameOver(nextHeadCoords, nextTailCoordsList);
 
   return {
     headCoords: nextHeadCoords,
-    tailCoords: nextTailCoords,
+    tailCoordsList: nextTailCoordsList,
     candyCoords: nextCandyCoords,
     snakeDirection: nextSnakeDirection,
     snakeLength: nextSnakeLength,
@@ -264,7 +267,7 @@ document.body.addEventListener('keydown', (e) => {
 
 // -------- frame rendering -------------
 
-const render = ({ headCoords, candyCoords, gameOver, tailCoords }) => {
+const render = ({ headCoords, candyCoords, gameOver, tailCoordsList }) => {
   if (gameOver) {
     const gameOverNode = getElement(ID.GAME_OVER);
     gameOverNode.style.opacity = '1';
@@ -281,7 +284,7 @@ const render = ({ headCoords, candyCoords, gameOver, tailCoords }) => {
         return COLOR.SNAKE;
       } else if (coordsAreEqual(coords, candyCoords)) {
         return COLOR.CANDY;
-      } else if (tailCoords.filter((c) => coordsAreEqual(c, coords)).length === 1) {
+      } else if (tailCoordsList.filter((c) => coordsAreEqual(c, coords)).length === 1) {
         return COLOR.SNAKE;
       } else {
         return COLOR.BACKGROUND;
