@@ -201,7 +201,7 @@ const getNextTailCoords = ({ snakeLength, tailCoordsList, headCoords }, nextHead
 
 const getNextGameOver = (headCoords, tailCoordsList) => {
   if (!isWithinBounds(headCoords, SIZE.BOARD)) return true;
-  if (tailCoordsList.some((t) => coordsAreEqual(headCoords, t))) return true;
+  if (tailCoordsList.some((c) => coordsAreEqual(headCoords, c))) return true;
   return false;
 };
 
