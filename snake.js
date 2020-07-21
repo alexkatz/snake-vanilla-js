@@ -1,10 +1,10 @@
 // -------- constants -------------------
 
-const FRAME_MS = 120;
+const FRAME_MS = 80;
 
 const SIZE = {
   PIXEL: 30,
-  BOARD: 25,
+  BOARD: 30,
 };
 
 const COLOR = {
@@ -97,7 +97,7 @@ const createSquares = () => {
 
 const createGameOverLabel = () => {
   const gameOverNode = createDiv(ID.GAME_OVER);
-  gameOverNode.innerText = 'whoops lol';
+  gameOverNode.innerText = 'heather is a cutie!';
   gameOverNode.style.color = COLOR.TEXT;
   gameOverNode.style.opacity = '0';
   getElement(ID.LABELS).append(gameOverNode);
@@ -112,10 +112,21 @@ const coordinatesFromIndex = (index) => ({
   j: Math.floor(index / SIZE.BOARD),
 });
 
-const getRandomCoords = () => ({
-  i: Math.floor(Math.random() * Math.floor(SIZE.BOARD)),
-  j: Math.floor(Math.random() * Math.floor(SIZE.BOARD)),
-});
+const getRandomCoords = (inset) => {
+  const coords = {
+    i: Math.floor(Math.random() * Math.floor(SIZE.BOARD)),
+    j: Math.floor(Math.random() * Math.floor(SIZE.BOARD)),
+  };
+
+  if (inset) {
+    if (coords.i < inset) coords.i = inset;
+    if (coords.i > SIZE.BOARD - inset) coords.i = SIZE.BOARD - inset;
+    if (coords.j < inset) coords.j = inset;
+    if (coords.j > SIZE.BOARD - inset) coords.j = SIZE.BOARD - inset;
+  }
+
+  return coords;
+};
 
 const coordinatesToId = ({ i, j }) => `${i}-${j}`;
 
@@ -132,8 +143,8 @@ const coordsAreEqual = (a, b) => a.i === b.i && a.j === b.j;
 
 const isWithinBounds = (coords, squareSize) => coords.i > -1 && coords.i < squareSize && coords.j > -1 && coords.j < squareSize;
 
-const getTraveledHeadCoords = ({ headCoords: { i, j } = getRandomCoords(), snakeDirection }) => {
-  switch (snakeDirection) {
+const getNextHeadCoords = ({ i, j } = getRandomCoords(10), direction) => {
+  switch (direction) {
     case DIRECTION.UP:
       return {
         i,
@@ -157,77 +168,80 @@ const getTraveledHeadCoords = ({ headCoords: { i, j } = getRandomCoords(), snake
   }
 };
 
-const getTraveledTailCoords = ({ snakeLength, headCoords, snakeDirection, tailCoords }) => {
+const getNextTailCoords = ({ snakeLength, tailCoords, headCoords }, nextHeadCoords, nextSnakeLength) => {
   if (tailCoords === undefined) {
-    return [];
+    // create initial tail based on snake length, always to the left since initial direction is right. minus 1 because the head is part of the length.
+    return [...Array(snakeLength - 1).keys()].map((i) => ({
+      i: nextHeadCoords.i - (i + 1),
+      j: nextHeadCoords.j,
+    }));
   }
 
-  // grow tail pixel by pixel from spawn point
-  if (tailCoords.length < snakeLength) {
-    let newTailCords;
-    switch (snakeDirection) {
-      case DIRECTION.UP:
-        newTailCords = {
-          i: headCoords.i,
-          j: headCoords.j - 1,
-        };
-        break;
-      case DIRECTION.DOWN:
-        newTailCords = {
-          i: headCoords.i,
-          j: headCoords.j + 1,
-        };
-        break;
-      case DIRECTION.RIGHT:
-        newTailCords = {
-          i: headCoords.i - 1,
-          j: headCoords.j,
-        };
-        break;
-      case DIRECTION.LEFT:
-        newTailCords = {
-          i: headCoords.i + 1,
-          j: headCoords.j,
-        };
-        break;
-    }
-
-    return [...tailCoords, newTailCords];
+  // we collected a candy! yum. snake must grow. we'll store the old end of the tail before the new tail is generated
+  let newTailCoords;
+  if (nextSnakeLength > snakeLength) {
+    newTailCoords = tailCoords[tailCoords.length - 1];
   }
 
-  return tailCoords;
+  // 0th index assumes old head, 1st index assumes 0th, 2nd index assumes 1st, etc.
+  const nextTailCoords = tailCoords.map((_, index) => {
+    if (index === 0) return headCoords;
+    return tailCoords[index - 1];
+  });
+
+  // if the tail should grow, we'll take the old end of the tail onto the end of the new tail, so it grows!
+  if (newTailCoords) {
+    nextTailCoords.push(newTailCoords);
+  }
+
+  return nextTailCoords;
 };
 
-const getGameOver = ({ headCoords }) => {
+const getNextGameOver = (headCoords) => {
   if (!isWithinBounds(headCoords, SIZE.BOARD)) return true;
   return false;
 };
+
+const getNextCandyCoords = (headCoords, candyCoords) => {
+  if (!coordsAreEqual(headCoords, candyCoords)) return candyCoords;
+  return getRandomCoords();
+};
+
+const getNextSnakeLength = (headCoords, candyCoords, snakeLength) => (coordsAreEqual(headCoords, candyCoords) ? snakeLength + 1 : snakeLength);
 
 // --------------------------------------
 
 // -------- game state ------------------
 
-let gameState = {
-  headCoords: undefined,
-  tailCoords: undefined,
-  candyCoords: getRandomCoords(),
-  snakeDirection: DIRECTION.RIGHT,
-  snakeLength: 3,
-  gameOver: false,
+const getNextGameState = (gameState) => {
+  if (!gameState)
+    return {
+      headCoords: undefined,
+      tailCoords: undefined,
+      candyCoords: getRandomCoords(),
+      snakeDirection: DIRECTION.RIGHT,
+      snakeLength: 2,
+      gameOver: false,
+    };
+
+  const nextSnakeDirection = CURRENT_SNAKE_DIRECTION || gameState.snakeDirection;
+  const nextHeadCoords = getNextHeadCoords(gameState.headCoords, nextSnakeDirection);
+  const nextCandyCoords = getNextCandyCoords(nextHeadCoords, gameState.candyCoords);
+  const nextSnakeLength = getNextSnakeLength(nextHeadCoords, gameState.candyCoords, gameState.snakeLength);
+  const nextTailCoords = getNextTailCoords(gameState, nextHeadCoords, nextSnakeLength);
+  const nextGameOver = getNextGameOver(nextHeadCoords);
+
+  return {
+    headCoords: nextHeadCoords,
+    tailCoords: nextTailCoords,
+    candyCoords: nextCandyCoords,
+    snakeDirection: nextSnakeDirection,
+    snakeLength: nextSnakeLength,
+    gameOver: nextGameOver,
+  };
 };
 
-const setGameState = (nextGameState) => {
-  const newGameState = {
-    ...gameState,
-    ...nextGameState,
-  };
-
-  gameState = {
-    ...newGameState,
-    tailCoords: getTraveledTailCoords(newGameState),
-    gameOver: getGameOver(newGameState),
-  };
-};
+let CURRENT_SNAKE_DIRECTION;
 
 // --------------------------------------
 
@@ -235,23 +249,14 @@ const setGameState = (nextGameState) => {
 
 document.body.addEventListener('keydown', (e) => {
   e = e || window.event;
-  const { snakeDirection } = gameState;
-  if (e.keyCode == '38' && snakeDirection !== DIRECTION.DOWN) {
-    setGameState({
-      snakeDirection: DIRECTION.UP,
-    });
-  } else if (e.keyCode == '40' && snakeDirection !== DIRECTION.UP) {
-    setGameState({
-      snakeDirection: DIRECTION.DOWN,
-    });
-  } else if (e.keyCode == '37' && snakeDirection !== DIRECTION.RIGHT) {
-    setGameState({
-      snakeDirection: DIRECTION.LEFT,
-    });
-  } else if (e.keyCode == '39' && snakeDirection !== DIRECTION.LEFT) {
-    setGameState({
-      snakeDirection: DIRECTION.RIGHT,
-    });
+  if (e.keyCode == '38' && CURRENT_SNAKE_DIRECTION !== DIRECTION.DOWN) {
+    CURRENT_SNAKE_DIRECTION = DIRECTION.UP;
+  } else if (e.keyCode == '40' && CURRENT_SNAKE_DIRECTION !== DIRECTION.UP) {
+    CURRENT_SNAKE_DIRECTION = DIRECTION.DOWN;
+  } else if (e.keyCode == '37' && CURRENT_SNAKE_DIRECTION !== DIRECTION.RIGHT) {
+    CURRENT_SNAKE_DIRECTION = DIRECTION.LEFT;
+  } else if (e.keyCode == '39' && CURRENT_SNAKE_DIRECTION !== DIRECTION.LEFT) {
+    CURRENT_SNAKE_DIRECTION = DIRECTION.RIGHT;
   }
 });
 
@@ -285,21 +290,23 @@ const render = ({ headCoords, candyCoords, gameOver, tailCoords }) => {
   }
 };
 
-// --------------------------------------
-
 initLayout();
 createBoard();
 createSquares();
 createGameOverLabel();
 
-(function loop() {
-  setGameState({
-    headCoords: getTraveledHeadCoords(gameState),
-  });
+// --------------------------------------
+
+// -------- game loop -------------------
+
+(function loop(oldGameState) {
+  const gameState = getNextGameState(oldGameState);
 
   render(gameState);
 
   if (gameState.gameOver) return;
 
-  setTimeout(loop, FRAME_MS);
-})();
+  setTimeout(() => loop(gameState), FRAME_MS);
+})(getNextGameState());
+
+// --------------------------------------
