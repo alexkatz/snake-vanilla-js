@@ -1,30 +1,44 @@
-// -------- variables -------------------
+// -------- game init properties --------
 
 let frameMs = 100;
-
+let candyTransitionLength = frameMs * 6;
 let initialSnakeLength = 3;
 
 let size = {
-  PIXEL: 32,
-  BOARD: 18,
+  PIXEL: 50,
+  BOARD: 12,
 };
+
+// --------------------------------------
+
+// -------- snake directionality --------
 
 let currentSnakeDirection;
 
 const directionQueue = [];
 
+// --------------------------------------
+
+const createTailColorIncrement = () => Math.floor(size.BOARD * 0.8);
+
+let tailColorIncrement = createTailColorIncrement();
+
+const TAIL_COLOR = [0, 200, 0];
+
+const rgbFromArray = arr => `rgb(${arr[0]}, ${arr[1]}, ${arr[2]}`;
+
 const COLOR = {
   BACKGROUND: 'black',
   TEXT: 'white',
-  SNAKE: 'lightgreen',
+  SNAKE_HEAD: rgbFromArray(TAIL_COLOR),
   CANDY: 'violet',
 };
 
 const DIRECTION = {
-  LEFT: 'left',
-  RIGHT: 'right',
-  UP: 'up',
-  DOWN: 'down',
+  LEFT: 37,
+  RIGHT: 39,
+  UP: 38,
+  DOWN: 40,
 };
 
 const INITIAL_SNAKE_DIRECTION = DIRECTION.RIGHT;
@@ -32,7 +46,8 @@ const INITIAL_SNAKE_DIRECTION = DIRECTION.RIGHT;
 const ID = {
   ROOT: 'root',
   BOARD: 'board',
-  LABELS: 'labels',
+  TOP_LABELS: 'top-labels',
+  BOTTOM_LABELS: 'bottom-labels',
   SCORE: 'score',
   GAME_STATUS: 'game-status',
   PIXEL: 'pixel',
@@ -47,9 +62,11 @@ const MESSAGES = {
 
 // -------- initialize the board --------
 
-const getElement = (id) => document.getElementById(id);
+const LABELS_CONTAINER_HEIGHT_PIXELS = '100px';
 
-const createDiv = (id) => {
+const getElement = id => document.getElementById(id);
+
+const createDiv = id => {
   const div = document.createElement('div');
 
   if (id) {
@@ -59,7 +76,7 @@ const createDiv = (id) => {
   return div;
 };
 
-const createInput = (id) => {
+const createInput = id => {
   const input = document.createElement('input');
   input.id = id;
   return input;
@@ -73,36 +90,36 @@ const initBodyStyle = () => {
   document.body.style.position = 'relative';
   document.body.style.height = '100%';
 
-  const htmlNode = document.getElementsByTagName('html')[0];
-  htmlNode.style.height = '100%';
+  const html = document.getElementsByTagName('html')[0];
+  html.style.height = '100%';
 };
 
 const createRoot = () => {
-  const rootNode = createDiv(ID.ROOT);
-  rootNode.style.width = '100%';
-  rootNode.style.height = '100%';
-  rootNode.style.display = 'flex';
-  rootNode.style.flexDirection = 'column';
-  rootNode.style.alignItems = 'center';
-  rootNode.style.justifyContent = 'center';
-  document.body.prepend(rootNode);
+  const root = createDiv(ID.ROOT);
+  root.style.width = '100%';
+  root.style.height = '100%';
+  root.style.display = 'flex';
+  root.style.flexDirection = 'column';
+  root.style.alignItems = 'center';
+  root.style.justifyContent = 'center';
+  document.body.prepend(root);
 };
 
 const createBoard = () => {
   const boardSizePixels = `${size.PIXEL * size.BOARD}px`;
   const rootNode = getElement(ID.ROOT);
 
-  const boardNode = createDiv(ID.BOARD);
-  boardNode.style.width = boardSizePixels;
-  boardNode.style.height = boardSizePixels;
-  boardNode.style.border = '1px solid rgba(255, 255, 255, 0.5)';
-  boardNode.style.display = 'flex';
-  boardNode.style.flexWrap = 'wrap';
-  rootNode.append(boardNode);
+  const boardContainer = createDiv(ID.BOARD);
+  boardContainer.style.width = boardSizePixels;
+  boardContainer.style.height = boardSizePixels;
+  boardContainer.style.border = '1px solid rgba(255, 255, 255, 0.5)';
+  boardContainer.style.display = 'flex';
+  boardContainer.style.flexWrap = 'wrap';
+  rootNode.append(boardContainer);
 };
 
 const createSquares = () => {
-  const boardNode = getElement(ID.BOARD);
+  const boardContainer = getElement(ID.BOARD);
   const squareSizePixels = `${size.PIXEL}px`;
 
   for (let i = 0; i < size.BOARD * size.BOARD; i += 1) {
@@ -112,33 +129,55 @@ const createSquares = () => {
     square.style.boxSizing = 'border-box';
     square.style.borderRadius = '6px';
     square.style.border = `1px solid ${COLOR.BACKGROUND}`;
-    boardNode.append(square);
+    boardContainer.append(square);
   }
 };
 
-const createLabels = () => {
-  const labelsNode = createDiv(ID.LABELS);
-  labelsNode.style.display = 'flex';
-  labelsNode.style.justifyContent = 'space-between';
-  labelsNode.style.alignItems = 'center';
-  labelsNode.style.width = `${size.BOARD * size.PIXEL}px`;
-  labelsNode.style.height = '100px';
-  getElement(ID.ROOT).append(labelsNode);
+const createTopLabelsContainer = () => {
+  const label = createDiv(ID.TOP_LABELS);
+  label.style.display = 'flex';
+  label.style.justifyContent = 'space-between';
+  label.style.alignItems = 'center';
+  label.style.width = `${size.BOARD * size.PIXEL}px`;
+  label.style.height = LABELS_CONTAINER_HEIGHT_PIXELS;
+  getElement(ID.ROOT).prepend(label);
+};
+
+const createTopLabel = () => {
+  const container = getElement(ID.TOP_LABELS);
+  const label = createDiv();
+  label.style.color = COLOR.TEXT;
+  label.style.paddingRight = '10px';
+  label.style.display = 'flex';
+  label.style.alignItems = 'center';
+  label.innerText = 'press spacebar or enter to pause or restart';
+  container.append(label);
+};
+
+const createBottomLabelsContainer = () => {
+  const container = createDiv(ID.BOTTOM_LABELS);
+  container.style.display = 'flex';
+  container.style.justifyContent = 'space-between';
+  container.style.alignItems = 'center';
+  container.style.width = `${size.BOARD * size.PIXEL}px`;
+  container.style.height = LABELS_CONTAINER_HEIGHT_PIXELS;
+  container.style.marginBottom = LABELS_CONTAINER_HEIGHT_PIXELS;
+  getElement(ID.ROOT).append(container);
 };
 
 const createGameStatusLabel = () => {
-  const gameStatusNode = createDiv(ID.GAME_STATUS);
-  gameStatusNode.style.color = COLOR.TEXT;
-  getElement(ID.LABELS).append(gameStatusNode);
+  const gameStatusLabel = createDiv(ID.GAME_STATUS);
+  gameStatusLabel.style.color = COLOR.TEXT;
+  getElement(ID.BOTTOM_LABELS).append(gameStatusLabel);
 };
 
-const createScoreInnerText = (score) => `tail: ${score}`;
+const createScoreInnerText = score => `tail: ${score}`;
 
 const createScoreLabel = () => {
-  const scoreNode = createDiv(ID.SCORE);
-  scoreNode.innerText = createScoreInnerText(initialSnakeLength);
-  scoreNode.style.color = COLOR.TEXT;
-  getElement(ID.LABELS).append(scoreNode);
+  const scoreLabel = createDiv(ID.SCORE);
+  scoreLabel.innerText = createScoreInnerText(initialSnakeLength);
+  scoreLabel.style.color = COLOR.TEXT;
+  getElement(ID.BOTTOM_LABELS).append(scoreLabel);
 };
 
 const createLabelInputPair = (id, text, initialValue) => {
@@ -149,9 +188,12 @@ const createLabelInputPair = (id, text, initialValue) => {
   const label = createDiv(`${id}-label`);
   label.style.color = COLOR.TEXT;
   label.style.paddingRight = '10px';
+  label.style.display = 'flex';
+  label.style.alignItems = 'center';
 
   const input = createInput(`${id}-input`);
   input.value = initialValue;
+  input.style.padding = '10px';
 
   label.innerText = text;
   container.append(label, input);
@@ -159,39 +201,42 @@ const createLabelInputPair = (id, text, initialValue) => {
   return container;
 };
 
-const createTopInputs = () => {
-  const topInputContainerNode = createDiv();
-  topInputContainerNode.style.display = 'flex';
-  topInputContainerNode.style.justifyContent = 'space-between';
-  topInputContainerNode.style.position = 'absolute';
-  topInputContainerNode.style.top = '0px';
-  topInputContainerNode.style.left = '0px';
+const createFixedInputs = () => {
+  const topInputContainer = createDiv();
+  topInputContainer.style.display = 'flex';
+  topInputContainer.style.justifyContent = 'space-between';
+  topInputContainer.style.justifyItems = 'center';
+  topInputContainer.style.position = 'absolute';
+  topInputContainer.style.top = '0px';
+  topInputContainer.style.left = '0px';
 
   const pixelPair = createLabelInputPair(ID.PIXEL, 'pixel size:', size.PIXEL);
   const boardPair = createLabelInputPair(ID.BOARD, 'board size:', size.BOARD);
   const fpsPair = createLabelInputPair(ID.FRAME_MS, 'ms per frame:', frameMs);
 
-  topInputContainerNode.append(pixelPair, boardPair, fpsPair);
+  topInputContainer.append(pixelPair, boardPair, fpsPair);
 
-  getElement(ID.ROOT).append(topInputContainerNode);
+  getElement(ID.ROOT).append(topInputContainer);
 };
 
-const showStatusText = (text) => {
+const showStatusText = text => {
   const label = getElement(ID.GAME_STATUS);
   label.innerText = text;
   label.style.opacity = '1';
 };
 
+const getCandyTransition = () => `background-color ${candyTransitionLength}ms linear`;
+
 // --------------------------------------
 
 // -------- utilities  ------------------
 
-const coordinatesFromIndex = (index) => ({
+const coordsFromIndex = index => ({
   i: index % size.BOARD,
   j: Math.floor(index / size.BOARD),
 });
 
-const getRandomCoords = (inset) => {
+const getRandomCoords = inset => {
   const coords = {
     i: Math.floor(Math.random() * Math.floor(size.BOARD)),
     j: Math.floor(Math.random() * Math.floor(size.BOARD)),
@@ -207,22 +252,22 @@ const getRandomCoords = (inset) => {
   return coords;
 };
 
-const coordinatesToId = ({ i, j }) => `${i}-${j}`;
+const coordsToId = ({ i, j }) => `${i}-${j}`;
 
-const coordinatesFromId = (id) => {
-  const [i, j] = id.split('-').map((char) => Number(char));
+const coordsFromId = id => {
+  const [i, j] = id.split('-').map(char => Number(char));
   return { i, j };
 };
 
-const createSquareId = (index) => coordinatesToId(coordinatesFromIndex(index));
+const createSquareId = index => coordsToId(coordsFromIndex(index));
 
-const getSquare = ({ i, j }) => getElement(coordinatesToId({ i, j }));
+const getSquare = ({ i, j }) => getElement(coordsToId({ i, j }));
 
 const areCoordsEqual = (a, b) => !a || !b || (a.i === b.i && a.j === b.j);
 
 const isWithinBounds = (coords, squareSize) => coords.i > -1 && coords.i < squareSize && coords.j > -1 && coords.j < squareSize;
 
-const getOppositeDirection = (direction) => {
+const getOppositeDirection = direction => {
   if (direction === DIRECTION.UP) return DIRECTION.DOWN;
   if (direction === DIRECTION.DOWN) return DIRECTION.UP;
   if (direction === DIRECTION.LEFT) return DIRECTION.RIGHT;
@@ -231,10 +276,13 @@ const getOppositeDirection = (direction) => {
 
 const areOppositeDirections = (a, b) => a === getOppositeDirection(b);
 
-const shouldQueueDirection = (direction) => {
+const shouldQueueDirection = direction => {
   const nextDirection = directionQueue.length > 0 ? directionQueue[directionQueue.length - 1] : currentSnakeDirection;
   return !areOppositeDirections(direction, nextDirection);
 };
+
+const getTailColor = index => rgbFromArray(TAIL_COLOR.map(val => val + tailColorIncrement * index));
+
 // --------------------------------------
 
 // -------- game functions  -------------
@@ -267,7 +315,7 @@ const getNextHeadCoords = ({ i, j }, direction) => {
 const getNextTailCoordsList = ({ snakeLength, tailCoordsList, headCoords }, nextHeadCoords, nextSnakeLength) => {
   if (tailCoordsList === undefined) {
     // create initial tail based on snake length, always to the left since initial direction is right. minus 1 because the head is part of the length.
-    return [...Array(snakeLength - 1).keys()].map((i) => ({
+    return [...Array(snakeLength - 1).keys()].map(i => ({
       i: nextHeadCoords.i - (i + 1),
       j: nextHeadCoords.j,
     }));
@@ -295,7 +343,7 @@ const getNextTailCoordsList = ({ snakeLength, tailCoordsList, headCoords }, next
 
 const getNextGameOver = (headCoords, tailCoordsList) => {
   if (!isWithinBounds(headCoords, size.BOARD)) return true;
-  if (tailCoordsList.some((c) => areCoordsEqual(headCoords, c))) return true;
+  if (tailCoordsList.some(c => areCoordsEqual(headCoords, c))) return true;
   return false;
 };
 
@@ -304,7 +352,7 @@ const getNextCandyCoords = (headCoords, tailCoordsList, candyCoords, attemptedCo
 
   const nextCandyCoords = getRandomCoords();
 
-  if ([headCoords, ...tailCoordsList, ...attemptedCoordinates].some((c) => areCoordsEqual(c, nextCandyCoords))) {
+  if ([headCoords, ...tailCoordsList, ...attemptedCoordinates].some(c => areCoordsEqual(c, nextCandyCoords))) {
     return getNextCandyCoords(headCoords, tailCoordsList, candyCoords, [...attemptedCoordinates, nextCandyCoords]);
   }
 
@@ -313,7 +361,7 @@ const getNextCandyCoords = (headCoords, tailCoordsList, candyCoords, attemptedCo
 
 const getNextSnakeLength = (headCoords, candyCoords, snakeLength) => (areCoordsEqual(headCoords, candyCoords) ? snakeLength + 1 : snakeLength);
 
-const getNextGameState = (gameState) => {
+const getNextGameState = gameState => {
   if (!gameState) {
     const headCoords = getRandomCoords(initialSnakeLength);
     const tailCoordsList = getNextTailCoordsList({ snakeLength: initialSnakeLength }, headCoords);
@@ -355,16 +403,20 @@ const render = (prevGameState, { headCoords, candyCoords, gameOver, tailCoordsLi
   }
 
   for (let i = 0; i < size.BOARD * size.BOARD; i += 1) {
-    const coords = coordinatesFromIndex(i);
-    getSquare(coords).style.backgroundColor = (() => {
-      if (areCoordsEqual(coords, headCoords)) {
-        return COLOR.SNAKE;
-      } else if (areCoordsEqual(coords, candyCoords)) {
+    const coords = coordsFromIndex(i);
+    const square = getSquare(coords);
+    square.style.backgroundColor = (() => {
+      if (areCoordsEqual(coords, candyCoords)) {
+        square.style.transition = getCandyTransition();
         return COLOR.CANDY;
-      } else if (tailCoordsList.filter((c) => areCoordsEqual(c, coords)).length === 1) {
-        return COLOR.SNAKE;
       } else {
-        return COLOR.BACKGROUND;
+        square.style.transition = null;
+        if (areCoordsEqual(coords, headCoords)) {
+          return COLOR.SNAKE_HEAD;
+        } else {
+          const tailIndex = tailCoordsList.findIndex(c => areCoordsEqual(c, coords));
+          return tailIndex > -1 ? getTailColor(tailIndex) : COLOR.BACKGROUND;
+        }
       }
     })();
   }
@@ -385,9 +437,11 @@ const createLayout = () => {
   createRoot();
   createBoard();
   createSquares();
-  createLabels();
+  createBottomLabelsContainer();
+  createTopLabelsContainer();
+  createTopLabel();
   createScoreLabel();
-  createTopInputs();
+  createFixedInputs();
   createGameStatusLabel();
 };
 
@@ -397,19 +451,17 @@ const createLayout = () => {
 
 const createLoop = () => {
   let isLooping;
-  let cachedGameState;
+  let gameState;
 
-  const loop = (prevGameState) => {
-    const gameState = getNextGameState(prevGameState);
+  const loop = prevGameState => {
+    gameState = getNextGameState(prevGameState);
     render(prevGameState, gameState);
-    cachedGameState = gameState;
-    if (gameState.gameOver || !isLooping) return;
-    setTimeout(() => loop(gameState), frameMs);
+    setTimeout(() => !gameState.gameOver && isLooping && loop(gameState), frameMs);
   };
 
   const isPaused = () => !isLooping;
 
-  const isGameOver = () => cachedGameState && cachedGameState.gameOver;
+  const isGameOver = () => gameState && gameState.gameOver;
 
   const pause = () => {
     isLooping = false;
@@ -422,7 +474,7 @@ const createLoop = () => {
 
   const resume = () => {
     isLooping = true;
-    loop(cachedGameState);
+    loop(gameState);
   };
 
   start();
@@ -439,45 +491,31 @@ const createLoop = () => {
 
 // -------- user input ------------------
 
-document.body.addEventListener('keydown', (e) => {
+document.body.addEventListener('keydown', e => {
   if (!loop.isPaused()) {
-    const direction = (() => {
-      switch (e.keyCode) {
-        case 37:
-          return DIRECTION.LEFT;
-        case 38:
-          return DIRECTION.UP;
-        case 39:
-          return DIRECTION.RIGHT;
-        case 40:
-          return DIRECTION.DOWN;
-        default:
-          return null;
-      }
-    })();
-
-    // if a queued direction exists and it is opposite of new direction, ignore
-    // if a queued direction does not exist, but current direction is opposite of new direction, ignore
-
-    if (shouldQueueDirection(direction)) {
+    const direction = Object.values(DIRECTION).find(keyCode => keyCode === e.keyCode);
+    if (direction && shouldQueueDirection(direction)) {
       directionQueue.push(direction);
     }
   }
 
-  if (e.keyCode === 13) {
+  // enter or spacebar
+  if (e.keyCode === 13 || e.keyCode === 32) {
     const pixelInput = getElement(`${ID.PIXEL}-input`);
     const boardInput = getElement(`${ID.BOARD}-input`);
     const fpsInput = getElement(`${ID.FRAME_MS}-input`);
     const inputs = [pixelInput, boardInput, fpsInput];
 
-    if (loop.isGameOver() || (loop.isPaused() && inputs.some((input) => input === document.activeElement))) {
+    if (loop.isGameOver() || inputs.some(input => input === document.activeElement)) {
       size.PIXEL = pixelInput.value;
       size.BOARD = boardInput.value;
       frameMs = fpsInput.value;
 
-      inputs.forEach((i) => i.blur());
+      inputs.forEach(i => i.blur());
 
       showStatusText('');
+
+      loop.pause();
 
       createLayout();
       loop = createLoop();
@@ -493,7 +531,7 @@ document.body.addEventListener('keydown', (e) => {
 
 // --------------------------------------
 
-// -------- on landing ------------------
+// -------- on page load ----------------
 
 createLayout();
 loop = createLoop();
