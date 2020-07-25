@@ -150,7 +150,7 @@ const createTopLabel = () => {
   label.style.paddingRight = '10px';
   label.style.display = 'flex';
   label.style.alignItems = 'center';
-  label.innerText = 'press spacebar or enter to pause or restart';
+  label.innerText = 'press spacebar or enter to pause or restart lol';
   container.append(label);
 };
 
